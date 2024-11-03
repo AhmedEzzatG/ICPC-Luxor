@@ -1,34 +1,57 @@
-/**
- * Author: Lukas Polacek
- * Date: 2009-10-30
- * License: CC0
- * Source: folklore/TopCoder
- * Description: Computes partial sums a[0] + a[1] + ... + a[pos - 1], and updates single elements a[i],
- * taking the difference between the old and new value.
- * Time: Both operations are $O(\log N)$.
- * Status: Stress-tested
- */
-#pragma once
-
-struct FT {
-	vector<ll> s;
-	FT(int n) : s(n) {}
-	void update(int pos, ll dif) { // a[pos] += dif
-		for (; pos < sz(s); pos |= pos + 1) s[pos] += dif;
-	}
-	ll query(int pos) { // sum of values in [0, pos)
-		ll res = 0;
-		for (; pos > 0; pos &= pos - 1) res += s[pos-1];
-		return res;
-	}
-	int lower_bound(ll sum) {// min pos st sum of [0, pos] >= sum
-		// Returns n if no sum is >= sum, or -1 if empty sum is.
-		if (sum <= 0) return -1;
-		int pos = 0;
-		for (int pw = 1 << 25; pw; pw >>= 1) {
-			if (pos + pw <= sz(s) && s[pos + pw-1] < sum)
-				pos += pw, sum -= s[pos-1];
-		}
-		return pos;
-	}
+template<typename T>
+struct fenwick_tree {
+    int n;
+    vector<T> BIT;
+    fenwick_tree(int n) : n(n), BIT(n + 1) {}
+    T getAccum(int idx) {
+        T sum = 0;
+        while (idx) {
+            sum += BIT[idx];
+            idx -= (idx & -idx);
+        }
+        return sum;
+    }
+    void add(int idx, T val) {
+        assert(idx != 0);
+        while (idx <= n) {
+            BIT[idx] += val;
+            idx += (idx & -idx);
+        }
+    }
+    T getValue(int idx) {
+        return getAccum(idx) - getAccum(idx - 1);
+    }
+    // ordered statistics tree
+    // get index that has value >= accum
+    // values must be positive
+    int getIdx(T accum) {
+        int start = 1, end = n, rt = -1;
+        while (start <= end) {
+            int mid = start + end >> 1;
+            T val = getAccum(mid);
+            if (val >= accum)
+                rt = mid, end = mid - 1;
+            else
+                start = mid + 1;
+        }
+        return rt;
+    }
+    //need review (from topcoder)
+    //last index less than or equal accum  O(logn)
+    int find(T accum) {
+        int i = 1, idx = 0;
+        while ((1 << i) <= n)
+            i <<= 1;
+        for (; i > 0; i >>= 1) {
+            int tidx = idx + i;
+            if (tidx > n)
+                continue;
+            if (accum >= BIT[tidx]) {
+                idx = tidx;
+                accum -= BIT[tidx];
+            }
+        }
+        if (!accum || idx + 1 > n)return -1;
+        return idx + 1;
+    }
 };

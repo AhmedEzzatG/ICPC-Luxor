@@ -1,53 +1,71 @@
-/**
- * Author: chilli
- * Date: 2019-04-26
- * License: CC0
- * Source: https://cp-algorithms.com/graph/dinic.html
- * Description: Flow algorithm with complexity $O(VE\log U)$ where $U = \max |\text{cap}|$.
- * $O(\min(E^{1/2}, V^{2/3})E)$ if $U = 1$; $O(\sqrt{V}E)$ for bipartite matching.
- * Status: Tested on SPOJ FASTFLOW and SPOJ MATCHING, stress-tested
- */
-#pragma once
 
 struct Dinic {
-	struct Edge {
-		int to, rev;
-		ll c, oc;
-		ll flow() { return max(oc - c, 0LL); } // if you need flows
+	struct flowEdge {
+		int from, to;
+		ll cap, flow = 0;
+		flowEdge(int from, int to, ll cap) :
+				from(from), to(to), cap(cap) {
+		}
 	};
-	vi lvl, ptr, q;
-	vector<vector<Edge>> adj;
-	Dinic(int n) : lvl(n), ptr(n), q(n), adj(n) {}
-	void addEdge(int a, int b, ll c, ll rcap = 0) {
-		adj[a].push_back({b, sz(adj[b]), c, c});
-		adj[b].push_back({a, sz(adj[a]) - 1, rcap, rcap});
+	vector<flowEdge> edges;
+	int n, m = 0, source, sink;
+	vector<vector<int>> adj;
+	vector<int> level, ptr;
+	Dinic(int n, int source, int sink) :
+			n(n), source(source), sink(sink), adj(n), level(n), ptr(n) {
 	}
-	ll dfs(int v, int t, ll f) {
-		if (v == t || !f) return f;
-		for (int& i = ptr[v]; i < sz(adj[v]); i++) {
-			Edge& e = adj[v][i];
-			if (lvl[e.to] == lvl[v] + 1)
-				if (ll p = dfs(e.to, t, min(f, e.c))) {
-					e.c -= p, adj[e.to][e.rev].c += p;
-					return p;
-				}
+	void addEdge(int u, int v, ll cap) {
+		edges.emplace_back(u, v, cap);
+		edges.emplace_back(v, u, 0);
+		adj[u].push_back(m);
+		adj[v].push_back(m + 1);
+		m += 2;
+	}
+	bool bfs() {
+		queue<int> q;
+		level = vector<int>(n, -1);
+		level[source] = 0;
+		q.push(source);
+		while (!q.empty()) {
+			int cur = q.front();
+			q.pop();
+			for (auto &id : adj[cur]) {
+				if (edges[id].cap - edges[id].flow <= 0)
+					continue;
+				int nxt = edges[id].to;
+				if (level[nxt] != -1)
+					continue;
+				level[nxt] = level[cur] + 1;
+				q.push(nxt);
+			}
+		}
+		return level[sink] != -1;
+	}
+	ll dfs(int node, ll cur_flow) {
+		if (cur_flow == 0 || node == sink)
+			return cur_flow;
+		for (int &cid = ptr[node]; cid < adj[node].size(); cid++) {
+			int id = adj[node][cid];
+			int nxt = edges[id].to;
+			if (level[node] + 1 != level[nxt]
+					|| edges[id].cap - edges[id].flow <= 0)
+				continue;
+			ll tmp = dfs(nxt, min(cur_flow, edges[id].cap - edges[id].flow));
+			if (tmp == 0)
+				continue;
+			edges[id].flow += tmp;
+			edges[id ^ 1].flow -= tmp;
+			return tmp;
 		}
 		return 0;
 	}
-	ll calc(int s, int t) {
-		ll flow = 0; q[0] = s;
-		rep(L,0,31) do { // 'int L=30' maybe faster for random data
-			lvl = ptr = vi(sz(q));
-			int qi = 0, qe = lvl[s] = 1;
-			while (qi < qe && !lvl[t]) {
-				int v = q[qi++];
-				for (Edge e : adj[v])
-					if (!lvl[e.to] && e.c >> (30 - L))
-						q[qe++] = e.to, lvl[e.to] = lvl[v] + 1;
-			}
-			while (ll p = dfs(s, t, LLONG_MAX)) flow += p;
-		} while (lvl[t]);
-		return flow;
+	ll flow() {
+		ll max_flow = 0;
+		while (bfs()) {
+			fill(ptr.begin(), ptr.end(), 0);
+			while (ll pushed = dfs(source, INF))
+				max_flow += pushed;
+		}
+		return max_flow;
 	}
-	bool leftOfMinCut(int a) { return lvl[a] != 0; }
 };

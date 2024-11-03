@@ -1,23 +1,32 @@
-/**
- * Author: User adamant on CodeForces
- * Source: http://codeforces.com/blog/entry/12143
- * Description: For each position in a string, computes p[0][i] = half length of
- *  longest even palindrome around pos i, p[1][i] = longest odd (half rounded down).
- * Time: O(N)
- * Status: Stress-tested
- */
-#pragma once
-
-array<vi, 2> manacher(const string& s) {
+void Manacher(string& s) {
 	int n = sz(s);
-	array<vi,2> p = {vi(n+1), vi(n)};
-	rep(z,0,2) for (int i=0,l=0,r=0; i < n; i++) {
-		int t = r-i+!z;
-		if (i<r) p[z][i] = min(t, p[z][l+t]);
-		int L = i-p[z][i], R = i+p[z][i]-!z;
-		while (L>=1 && R+1<n && s[L-1] == s[R+1])
-			p[z][i]++, L--, R++;
-		if (R>r) l=L, r=R;
+	vector<int> d1(n);
+	//d1[i] and d2[i], denoting the number of
+	//palindromes accordingly with odd and even lengths with
+	//centers in the position  i
+	// with d2 the center of aa is pos 1  
+	// 0-based
+	for (int i = 0, l = 0, r = -1; i < n; i++) {
+		int k = (i > r) ? 1 : min(d1[l + r - i], r - i + 1);
+		while (0 <= i - k && i + k < n && s[i - k] == s[i + k]) {
+			k++;
+		}
+		d1[i] = k--;
+		if (i + k > r) {
+			l = i - k;
+			r = i + k;
+		}
 	}
-	return p;
+	vector<int> d2(n);
+	for (int i = 0, l = 0, r = -1; i < n; i++) {
+		int k = (i > r) ? 0 : min(d2[l + r - i + 1], r - i + 1);
+		while (0 <= i - k - 1 && i + k < n && s[i - k - 1] == s[i + k]) {
+			k++;
+		}
+		d2[i] = k--;
+		if (i + k > r) {
+			l = i - k - 1;
+			r = i + k;
+		}
+	}
 }

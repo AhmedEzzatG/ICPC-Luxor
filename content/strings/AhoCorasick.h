@@ -1,85 +1,83 @@
-/**
- * Author: Simon Lindholm
- * Date: 2015-02-18
- * License: CC0
- * Source: marian's (TC) code
- * Description: Aho-Corasick automaton, used for multiple pattern matching.
- * Initialize with AhoCorasick ac(patterns); the automaton start node will be at index 0.
- * find(word) returns for each position the index of the longest word that ends there, or -1 if none.
- * findAll($-$, word) finds all words (up to $N \sqrt N$ many if no duplicate patterns)
- * that start at each position (shortest first).
- * Duplicate patterns are allowed; empty patterns are not.
- * To find the longest words that start at each position, reverse all input.
- * For large alphabets, split each symbol into chunks, with sentinel bits for symbol boundaries.
- * Time: construction takes $O(26N)$, where $N =$ sum of length of patterns.
- * find(x) is $O(N)$, where N = length of x. findAll is $O(NM)$.
- * Status: stress-tested
- */
-#pragma once
+#define all(v) v.begin(),v.end()
 
-struct AhoCorasick {
-	enum {alpha = 26, first = 'A'}; // change this!
-	struct Node {
-		// (nmatches is optional)
-		int back, next[alpha], start = -1, end = -1, nmatches = 0;
-		Node(int v) { memset(next, v, sizeof(next)); }
+struct aho_corasick {
+	struct trie_node {
+		vector<int> pIdxs; //probably take memory limit
+		map<char, int> next;
+		int fail;
+		trie_node() :
+				fail(0) {
+		}
+		bool have_next(char ch) {
+			return next.find(ch) != next.end();
+		}
+		int& operator[](char ch) {
+			return next[ch];
+		}
 	};
-	vector<Node> N;
-	vi backp;
-	void insert(string& s, int j) {
-		assert(!s.empty());
-		int n = 0;
-		for (char c : s) {
-			int& m = N[n].next[c - first];
-			if (m == -1) { n = m = sz(N); N.emplace_back(-1); }
-			else n = m;
+	vector<trie_node> t;
+	vector<string> patterns;
+	vector<int> end_of_pattern;
+	vector<vector<int>> adj;
+	int insert(const string &s, int patternIdx) {
+		int root = 0;
+		for (const char &ch : s) {
+			if (!t[root].have_next(ch)) {
+				t.push_back(trie_node());
+				t[root][ch] = t.size() - 1;
+			}
+			root = t[root][ch];
 		}
-		if (N[n].end == -1) N[n].start = j;
-		backp.push_back(N[n].end);
-		N[n].end = j;
-		N[n].nmatches++;
+		t[root].pIdxs.push_back(patternIdx);
+		return root;
 	}
-	AhoCorasick(vector<string>& pat) : N(1, -1) {
-		rep(i,0,sz(pat)) insert(pat[i], i);
-		N[0].back = sz(N);
-		N.emplace_back(0);
-
+	int next_state(int cur, char ch) {
+		while (cur > 0 && !t[cur].have_next(ch))
+			cur = t[cur].fail;
+		if (t[cur].have_next(ch))
+			return t[cur][ch];
+		return 0;
+	}
+	void buildAhoTree() {
 		queue<int> q;
-		for (q.push(0); !q.empty(); q.pop()) {
-			int n = q.front(), prev = N[n].back;
-			rep(i,0,alpha) {
-				int &ed = N[n].next[i], y = N[prev].next[i];
-				if (ed == -1) ed = y;
-				else {
-					N[ed].back = y;
-					(N[ed].end == -1 ? N[ed].end : backp[N[ed].start])
-						= N[y].end;
-					N[ed].nmatches += N[y].nmatches;
-					q.push(ed);
-				}
+		for (auto &child : t[0].next)
+			q.push(child.second);
+		while (!q.empty()) {
+			int cur = q.front();
+			q.pop();
+			for (auto &child : t[cur].next) {
+				int k = next_state(t[cur].fail, child.first);
+				t[child.second].fail = k;
+				vector<int> &idxs = t[child.second].pIdxs;
+				//dp[child.second] = max(dp[child.second],dp[k]);
+				idxs.insert(idxs.end(), all(t[k].pIdxs));
+				q.push(child.second);
 			}
 		}
 	}
-	vi find(string word) {
-		int n = 0;
-		vi res; // ll count = 0;
-		for (char c : word) {
-			n = N[n].next[c - first];
-			res.push_back(N[n].end);
-			// count += N[n].nmatches;
-		}
-		return res;
+	void buildFailureTree() {
+		adj = vector<vector<int>>(t.size());
+		for (int i = 1; i < t.size(); i++)
+			adj[t[i].fail].push_back(i);
 	}
-	vector<vi> findAll(vector<string>& pat, string word) {
-		vi r = find(word);
-		vector<vi> res(sz(word));
-		rep(i,0,sz(word)) {
-			int ind = r[i];
-			while (ind != -1) {
-				res[i - sz(pat[ind]) + 1].push_back(ind);
-				ind = backp[ind];
-			}
+	aho_corasick(const vector<string> &_patterns) {
+		t.push_back(trie_node());
+		patterns = _patterns;
+		end_of_pattern = vector<int>(patterns.size());
+		for (int i = 0; i < patterns.size(); i++)
+			end_of_pattern[i] = insert(patterns[i], i);
+		buildAhoTree();
+		buildFailureTree();
+	}
+	vector<vector<int>> match(const string &str) {
+		int k = 0;
+		vector<vector<int>> rt(patterns.size());
+		for (int i = 0; i < str.size(); i++) {
+			k = next_state(k, str[i]);
+			for (auto &it : t[k].pIdxs)
+				rt[it].push_back(i);
 		}
-		return res;
+		return rt;
 	}
 };
+

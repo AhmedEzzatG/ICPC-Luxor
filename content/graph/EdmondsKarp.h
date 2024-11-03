@@ -1,47 +1,39 @@
-/**
- * Author: Chen Xing
- * Date: 2009-10-13
- * License: CC0
- * Source: N/A
- * Description: Flow algorithm with guaranteed complexity $O(VE^2)$. To get edge flow values, compare
- * capacities before and after, and take the positive values only.
- * Status: stress-tested
- */
-#pragma once
+//O( V * E * E)
 
-template<class T> T edmondsKarp(vector<unordered_map<int, T>>&
-		graph, int source, int sink) {
-	assert(source != sink);
-	T flow = 0;
-	vi par(sz(graph)), q = par;
-
-	for (;;) {
-		fill(all(par), -1);
-		par[source] = 0;
-		int ptr = 1;
-		q[0] = source;
-
-		rep(i,0,ptr) {
-			int x = q[i];
-			for (auto e : graph[x]) {
-				if (par[e.first] == -1 && e.second > 0) {
-					par[e.first] = x;
-					q[ptr++] = e.first;
-					if (e.first == sink) goto out;
-				}
+int n;
+int capacity[101][101];
+int getPath(int src, int dest, vector<int> &parent) {
+	parent = vector<int>(n + 1, -1);
+	queue<pair<int, int>> q;
+	q.push( { src, INF });
+	while (q.size()) {
+		int cur = q.front().first, flow = q.front().second;
+		q.pop();
+		if (cur == dest)
+			return flow;
+		for (int i = 1; i <= n; i++)
+			if (parent[i] == -1 && capacity[cur][i]) {
+				parent[i] = cur;
+				q.push( { i, min(flow, capacity[cur][i]) });
+				if (i == dest)
+					return q.back().second;
 			}
-		}
-		return flow;
-out:
-		T inc = numeric_limits<T>::max();
-		for (int y = sink; y != source; y = par[y])
-			inc = min(inc, graph[par[y]][y]);
-
-		flow += inc;
-		for (int y = sink; y != source; y = par[y]) {
-			int p = par[y];
-			if ((graph[p][y] -= inc) <= 0) graph[p].erase(y);
-			graph[y][p] += inc;
-		}
 	}
+	return 0;
+}
+int Edmonds_Karp(int source, int sink) {
+	int max_flow = 0;
+	int new_flow = 0;
+	vector<int> parent(n + 1, -1);
+	while (new_flow = getPath(source, sink, parent)) {
+		max_flow += new_flow;
+		int cur = sink;
+		while (cur != source) {
+			int prev = parent[cur];
+			capacity[prev][cur] -= new_flow;
+			capacity[cur][prev] += new_flow;
+			cur = prev;
+		};
+	}
+	return max_flow;
 }

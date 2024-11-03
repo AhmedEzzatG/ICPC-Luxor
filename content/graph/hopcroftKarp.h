@@ -1,61 +1,58 @@
-/**
- * Author: Chen Xing
- * Date: 2009-10-13
- * License: CC0
- * Source: N/A
- * Description: Fast bipartite matching algorithm. Graph $g$ should be a list
- * of neighbors of the left partition, and $btoa$ should be a vector full of
- * -1's of the same size as the right partition. Returns the size of
- * the matching. $btoa[i]$ will be the match for vertex $i$ on the right side,
- * or $-1$ if it's not matched.
- * Usage: vi btoa(m, -1); hopcroftKarp(g, btoa);
- * Time: O(\sqrt{V}E)
- * Status: stress-tested by MinimumVertexCover, and tested on oldkattis.adkbipmatch and SPOJ:MATCHING
- */
-#pragma once
-
-bool dfs(int a, int L, vector<vi>& g, vi& btoa, vi& A, vi& B) {
-	if (A[a] != L) return 0;
-	A[a] = -1;
-	for (int b : g[a]) if (B[b] == L + 1) {
-		B[b] = 0;
-		if (btoa[b] == -1 || dfs(btoa[b], L + 1, g, btoa, A, B))
-			return btoa[b] = a, 1;
-	}
-	return 0;
-}
-
-int hopcroftKarp(vector<vi>& g, vi& btoa) {
-	int res = 0;
-	vi A(g.size()), B(btoa.size()), cur, next;
-	for (;;) {
-		fill(all(A), 0);
-		fill(all(B), 0);
-		/// Find the starting nodes for BFS (i.e. layer 0).
-		cur.clear();
-		for (int a : btoa) if(a != -1) A[a] = -1;
-		rep(a,0,sz(g)) if(A[a] == 0) cur.push_back(a);
-		/// Find all layers using bfs.
-		for (int lay = 1;; lay++) {
-			bool islast = 0;
-			next.clear();
-			for (int a : cur) for (int b : g[a]) {
-				if (btoa[b] == -1) {
-					B[b] = lay;
-					islast = 1;
-				}
-				else if (btoa[b] != a && !B[b]) {
-					B[b] = lay;
-					next.push_back(btoa[b]);
+//Hopcroft-Karp algorithm for maximum bipartite matching
+//O(sqrt(V) * E)
+struct Hopcroft_Karp {//1-based
+#define NIL 0
+#define INF INT_MAX
+	int n, m;
+	vector<vector<int>> adj;
+	vector<int> rowAssign, colAssign, dist;
+	bool bfs() {
+		queue<int> q;
+		dist = vector<int>(adj.size(), INF);
+		for (int i = 1; i <= n; i++)
+			if (rowAssign[i] == NIL) {
+				dist[i] = 0;
+				q.push(i);
+			}
+		while (!q.empty()) {
+			int cur = q.front();
+			q.pop();
+			if (dist[cur] >= dist[NIL])break;
+			for (auto& nxt : adj[cur]) {
+				if (dist[colAssign[nxt]] == INF) {
+					dist[colAssign[nxt]] = dist[cur] + 1;
+					q.push(colAssign[nxt]);
 				}
 			}
-			if (islast) break;
-			if (next.empty()) return res;
-			for (int a : next) A[a] = lay;
-			cur.swap(next);
 		}
-		/// Use DFS to scan for augmenting paths.
-		rep(a,0,sz(g))
-			res += dfs(a, 0, g, btoa, A, B);
+		return dist[NIL] != INF;
 	}
-}
+	bool dfs(int i) {
+		if (i == NIL)
+			return true;
+		for (int j : adj[i]) {
+			if (dist[colAssign[j]] == dist[i] + 1 && dfs(colAssign[j])) {
+				colAssign[j] = i;
+				rowAssign[i] = j;
+				return true;
+			}
+		}
+		dist[i] = INF;
+		return false;
+	}
+	Hopcroft_Karp(int n, int m)
+		:n(n), m(m), adj(n + 1), rowAssign(n + 1), colAssign(m + 1) {
+	}
+	void addEdge(int u, int v) {
+		adj[u].push_back(v);
+	}
+	int maximum_bipartite_matching() {
+		int rt = 0;
+		while (bfs()) {
+			for (int i = 1; i <= n; i++)
+				if (rowAssign[i] == NIL && dfs(i))
+					rt++;
+		}
+		return rt;
+	}
+};
